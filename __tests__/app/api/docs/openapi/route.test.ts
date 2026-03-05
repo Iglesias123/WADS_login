@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { GET } from "@/app/api/docs/openapi/route";
+import { GET } from "@/app/api/docs/openai/route";
 
 describe("GET /api/docs/openapi", () => {
   it("returns 200 and JSON with openapi field", async () => {
