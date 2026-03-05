@@ -1,12 +1,18 @@
-export let users = [
+export let assignments = [
   {
     id: 1,
-    name: "Jessica",
-    email: "jessica@email.com",
+    title: "Math Homework",
+    description: "Homework",
+    status: "On Process",
+    assignmentDate: new Date().toISOString(), 
+    dueDate: "2026-05-03",
   },
   {
     id: 2,
-    name: "John",
-    email: "john@email.com",
+    title: "Physics Report",
+    description: "Lab report",
+    status: "Submitted",
+    assignmentDate: new Date().toISOString(),
+    dueDate: "2026-05-03",
   },
 ];
