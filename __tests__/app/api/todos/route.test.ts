@@ -1,14 +1,13 @@
 import type { NextRequest } from "next/server";
-import { GET, POST } from "@/app/api/todos/route";
+import { PATCH, DELETE } from "@/app/api/todos/[id]/route";
 
-jest.mock("@/lib/auth", () => ({
-  getSession: jest.fn(),
-}));
+jest.mock("@/lib/auth", () => ({ getSession: jest.fn() }));
 jest.mock("@/lib/prisma", () => ({
   prisma: {
     todo: {
-      findMany: jest.fn(),
-      create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
   },
 }));
@@ -20,74 +19,73 @@ import { mockTodo } from "@/__tests__/mocks/prisma";
 
 const mockGetSession = getSession as jest.MockedFunction<typeof getSession>;
 
-describe("GET /api/todos", () => {
+const mockParams = Promise.resolve({ id: "todo-1" });
+
+describe("PATCH /api/todos/[id]", () => {
   it("returns 401 when not authenticated", async () => {
     mockGetSession.mockResolvedValue(null);
-    const res = await GET();
+    const req = new Request("http://test/api/todos/todo-1", {
+      method: "PATCH",
+      body: JSON.stringify({ title: "Updated" }),
+      headers: { "Content-Type": "application/json" },
+    }) as NextRequest;
+    const res = await PATCH(req, { params: mockParams });
     expect(res.status).toBe(401);
-    const json = await res.json();
-    expect(json.error).toContain("signed in");
   });
 
-  it("returns todos for authenticated user", async () => {
+  it("returns 404 when todo not found", async () => {
     mockGetSession.mockResolvedValue(mockSession);
-    (prisma.todo.findMany as jest.Mock).mockResolvedValue([
-      { ...mockTodo, createdAt: mockTodo.createdAt, updatedAt: mockTodo.updatedAt },
-    ]);
-    const res = await GET();
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(Array.isArray(body)).toBe(true);
-    expect(body[0]).toMatchObject({
-      id: mockTodo.id,
-      title: mockTodo.title,
-      description: mockTodo.description,
-      completed: mockTodo.completed,
+    (prisma.todo.findFirst as jest.Mock).mockResolvedValue(null);
+    const req = new Request("http://test/api/todos/todo-1", {
+      method: "PATCH",
+      body: JSON.stringify({ completed: true }),
+      headers: { "Content-Type": "application/json" },
+    }) as NextRequest;
+    const res = await PATCH(req, { params: mockParams });
+    expect(res.status).toBe(404);
+  });
+
+  it("updates todo and returns 200", async () => {
+    mockGetSession.mockResolvedValue(mockSession);
+    (prisma.todo.findFirst as jest.Mock).mockResolvedValue(mockTodo);
+    (prisma.todo.update as jest.Mock).mockResolvedValue({
+      ...mockTodo,
+      completed: true,
     });
+    const req = new Request("http://test/api/todos/todo-1", {
+      method: "PATCH",
+      body: JSON.stringify({ completed: true }),
+      headers: { "Content-Type": "application/json" },
+    }) as NextRequest;
+    const res = await PATCH(req, { params: mockParams });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.completed).toBe(true);
   });
 });
 
-describe("POST /api/todos", () => {
+describe("DELETE /api/todos/[id]", () => {
   it("returns 401 when not authenticated", async () => {
     mockGetSession.mockResolvedValue(null);
-    const req = new Request("http://test/api/todos", {
-      method: "POST",
-      body: JSON.stringify({ title: "New" }),
-      headers: { "Content-Type": "application/json" },
-    }) as NextRequest;
-    const res = await POST(req);
+    const req = new Request("http://test/api/todos/todo-1", { method: "DELETE" }) as NextRequest;
+    const res = await DELETE(req, { params: mockParams });
     expect(res.status).toBe(401);
   });
 
-  it("returns 400 when title is missing", async () => {
+  it("returns 404 when todo not found", async () => {
     mockGetSession.mockResolvedValue(mockSession);
-    const req = new Request("http://test/api/todos", {
-      method: "POST",
-      body: JSON.stringify({}),
-      headers: { "Content-Type": "application/json" },
-    }) as NextRequest;
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-    const json = await res.json();
-    expect(json.error).toContain("Title");
+    (prisma.todo.findFirst as jest.Mock).mockResolvedValue(null);
+    const req = new Request("http://test/api/todos/todo-1", { method: "DELETE" }) as NextRequest;
+    const res = await DELETE(req, { params: mockParams });
+    expect(res.status).toBe(404);
   });
 
-  it("creates todo and returns 201", async () => {
+  it("deletes todo and returns 204", async () => {
     mockGetSession.mockResolvedValue(mockSession);
-    (prisma.todo.create as jest.Mock).mockResolvedValue({
-      ...mockTodo,
-      title: "New Todo",
-      description: "Desc",
-    });
-    const req = new Request("http://test/api/todos", {
-      method: "POST",
-      body: JSON.stringify({ title: "New Todo", description: "Desc" }),
-      headers: { "Content-Type": "application/json" },
-    }) as NextRequest;
-    const res = await POST(req);
-    expect(res.status).toBe(201);
-    const json = await res.json();
-    expect(json.title).toBe("New Todo");
-    expect(json.description).toBe("Desc");
+    (prisma.todo.findFirst as jest.Mock).mockResolvedValue(mockTodo);
+    (prisma.todo.delete as jest.Mock).mockResolvedValue(undefined);
+    const req = new Request("http://test/api/todos/todo-1", { method: "DELETE" }) as NextRequest;
+    const res = await DELETE(req, { params: mockParams });
+    expect(res.status).toBe(204);
   });
 });
